@@ -402,7 +402,7 @@ fun TodayHourlyForecast(
             contentPadding = PaddingValues(horizontal = 16.dp)
         ) {
             // Safely take first 10 items or however many are available
-            val hourlyData = weather?.hourlyForecast ?: emptyList()
+            val hourlyData = weather?.hourlyForecast?.take(10) ?: emptyList()
 
             items(hourlyData.size) { index ->
                 val item = hourlyData[index]
