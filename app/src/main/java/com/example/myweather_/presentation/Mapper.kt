@@ -21,7 +21,7 @@ fun WeatherDomainModel.toUiModel(): WeatherUiModel {
         hourlyTimes = hourlyTimes,
         hourlyTemperatures = hourlyTemperatures,
         hourlyWeatherCodes = hourlyWeatherCodes,
-        isDay=isDay
+        isDay = isDay
     )
 
     return WeatherUiModel(
@@ -53,14 +53,14 @@ fun mapToDailyUiItems(
             time = SimpleDateFormat("yyyy-MM-dd").parse(dateStr)
         }
         when (cal.get(Calendar.DAY_OF_WEEK)) {
-            Calendar.SUNDAY -> "Sun"
-            Calendar.MONDAY -> "Mon"
-            Calendar.TUESDAY -> "Tue"
-            Calendar.WEDNESDAY -> "Wed"
-            Calendar.THURSDAY -> "Thu"
-            Calendar.FRIDAY -> "Fri"
-            Calendar.SATURDAY -> "Sat"
-            else -> "??"
+            Calendar.SUNDAY -> "Sunday"
+            Calendar.MONDAY -> "Monday"
+            Calendar.TUESDAY -> "Tuesday"
+            Calendar.WEDNESDAY -> "Wednesday"
+            Calendar.THURSDAY -> "Thursday"
+            Calendar.FRIDAY -> "Friday"
+            Calendar.SATURDAY -> "Saturday"
+            else -> "None"
         }
     }
 

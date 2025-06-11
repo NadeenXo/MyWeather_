@@ -1,6 +1,8 @@
 package com.example.myweather_.presentation
 
 import android.util.Log
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -32,11 +35,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -69,6 +73,10 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 //    LaunchedEffect(Unit) {
 //        viewModel.fetchLocation()
 //    }
+    val scrollState = rememberLazyListState()
+    val scrollOffset = remember {
+        derivedStateOf { scrollState.firstVisibleItemScrollOffset }
+    }
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -104,24 +112,20 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
         BlackTransparent70
     }
 
-//
-//    val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-//    val icons = listOf(
-//        R.drawable.clear_sky_day, R.drawable.partly_cloudy_day, R.drawable.rain_intensity_day,
-//        R.drawable.clear_sky_day, R.drawable.partly_cloudy_day, R.drawable.rain_intensity_day,
-//        R.drawable.clear_sky_day
-//    )
-//    val minTemps = listOf(15, 17, 14, 16, 18, 13, 15)
-//    val maxTemps = listOf(25, 27, 22, 24, 26, 23, 24)
 
     LazyColumn(
+        state = scrollState,
         modifier = Modifier
             .fillMaxSize()
             .background(brush = gradientBrush)
             .padding(bottom = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        item { WeatherHeaderSection(textColor, weatherState, locationName) }
+        item {
+            WeatherHeaderSection(
+                textColor, weatherState, locationName, scrollOffset.value
+            )
+        }
         item {
             WeatherStatsGrid(weather = weatherState.value, cardBG = cardBG, textColor = textColor)
         }
@@ -147,7 +151,6 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 
                 Column(
                     modifier = Modifier.background(
-//                        color = WhiteTransparent70.copy(alpha = 0.1f),
                         color = cardBG,
                         shape = RoundedCornerShape(
                             topStart = 16.dp,
@@ -197,17 +200,55 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 fun WeatherHeaderSection(
     textColor: Color,
     weatherState: State<WeatherUiModel?>,
-    locationName: String
+    locationName: String,
+    scrollOffset: Int
 ) {
     val weather = weatherState.value
+    val isShrunk = scrollOffset > 150
 
+    //img
+    val animatedHeight = animateDpAsState(
+        targetValue = if (isShrunk) 120.dp else 200.dp,
+        label = "AnimatedHeight"
+    )
+
+    val animatedOffsetY = animateDpAsState(
+        targetValue = if (isShrunk) (35).dp else 0.dp,
+        label = "AnimatedOffsetY"
+    )
+
+    val animatedOffsetX = animateDpAsState(
+        targetValue = if (isShrunk) (-100).dp else 0.dp,
+        label = "AnimatedOffsetX"
+    )
+
+    //temp
+    val animatedTempOffsetX = animateDpAsState(
+        targetValue = if (isShrunk) 100.dp else 0.dp,
+        label = "TempX"
+    )
+    val animatedTempOffsetY = animateDpAsState(
+        targetValue = if (isShrunk) (-70).dp else 0.dp,
+        label = "TempY"
+    )
+    val animatedTempAlignment = remember {
+        derivedStateOf {
+            if (isShrunk) Alignment.TopEnd else Alignment.Center
+        }
+    }
+
+
+    val animatedAlignment = remember {
+        derivedStateOf {
+            if (isShrunk) Alignment.TopStart else Alignment.Center
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 64.dp, bottom = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Location Row
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 painter = painterResource(R.drawable.location),
@@ -224,49 +265,71 @@ fun WeatherHeaderSection(
         }
 
         Spacer(modifier = Modifier.padding(bottom = 8.dp))
-
-        ShadowBlurBehindImage(
-            weather?.weatherIconRes ?: R.drawable.ic_launcher_foreground
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(animatedHeight.value)
+                .padding(start = 12.dp)
+                .offset(x = animatedOffsetX.value, y = animatedOffsetY.value)
+                .animateContentSize(),
+            contentAlignment = animatedAlignment.value
+        ) {
+            ShadowBlurBehindImage(
+                weather?.weatherIconRes ?: R.drawable.ic_launcher_foreground
+            )
+        }
 
         Spacer(modifier = Modifier.padding(bottom = 12.dp))
 
-        // Temperature
-        Text(
-            text = weather?.temperature ?: "--°C",
-            color = textColor,
-            fontWeight = FontWeight.Bold,
-            fontSize = 64.sp
-        )
 
-        // Description
-        Text(
-            text = weather?.weatherName ?: "Loading...",
-            color = textColor,
-            fontWeight = FontWeight.Light,
-            fontSize = 16.sp
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
 
         Box(
             modifier = Modifier
-                .background(
-                    color = GrayTransparent66.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(16.dp)
-                )
-                .padding(vertical = 8.dp, horizontal = 24.dp)
+                .fillMaxWidth()
+                .offset(x = animatedTempOffsetX.value, y = animatedTempOffsetY.value)
+                .padding(end = 12.dp)
+                .animateContentSize(),
+            contentAlignment = animatedTempAlignment.value
         ) {
-            if (weather != null && weather.dailyForecast.isNotEmpty()) {
-                TemperatureRange(
-                    min = weather.dailyForecast[0].min,
-                    max = weather.dailyForecast[0].max,
-                    textColor = textColor
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = weather?.temperature ?: "--°C",
+                    color = textColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = if (isShrunk) 40.sp else 64.sp
                 )
-            } else {
-                TemperatureRange(min = "", max = "", textColor = textColor)
+
+                Text(
+                    text = weather?.weatherName ?: "Loading...",
+                    color = textColor,
+                    fontWeight = FontWeight.Light,
+                    fontSize = if (isShrunk) 14.sp else 16.sp
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // min/max temp
+                Box(
+                    modifier = Modifier
+                        .background(
+                            color = GrayTransparent66.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .padding(vertical = 8.dp, horizontal = 24.dp)
+                ) {
+                    if (weather != null && weather.dailyForecast.isNotEmpty()) {
+                        TemperatureRange(
+                            min = weather.dailyForecast[0].min,
+                            max = weather.dailyForecast[0].max,
+                            textColor = textColor
+                        )
+                    } else {
+                        TemperatureRange(min = "", max = "", textColor = textColor)
+                    }
+                }
             }
         }
+
     }
 }
 
@@ -275,24 +338,21 @@ fun ShadowBlurBehindImage(weatherIconRes: Int) {
     Box(
         modifier = Modifier
             .height(200.dp)
-//            .wrapContentWidth()
-//            .align(Alignment.Center)
 
     ) {
         Box(
 
             modifier = Modifier
-//                .fillMaxHeight()
                 .matchParentSize()
                 .clip(shape = CircleShape)
                 .graphicsLayer {
-                    translationY = 4f // vertical offset for shadow
-                    alpha = 0.25f // make it transparent
+                    translationY = 4f
+                    alpha = 0.25f
                     scaleX = 2.5f
-                    scaleY = 3f // slightly bigger for a nice glow effect
+                    scaleY = 3f
                     shadowElevation = 1f
                 }
-                .blur(5.dp) // Apply blur to simulate softness
+                .blur(5.dp)
         )
 
         // Actual image
@@ -300,7 +360,6 @@ fun ShadowBlurBehindImage(weatherIconRes: Int) {
             painter = painterResource(id = weatherIconRes),
             contentDescription = null,
             contentScale = ContentScale.Fit,
-//            modifier = Modifier.matchParentSize()
         )
     }
 
@@ -463,6 +522,18 @@ fun TodayHourlyForecast(
                                 )
                             }
                         }
+                        Box(
+                            modifier = Modifier
+                                .clip(shape = CircleShape)
+                                .graphicsLayer {
+                                    translationY = 4f
+                                    alpha = 0.25f
+                                    scaleX = .2f
+                                    scaleY = 0.5f
+                                    shadowElevation = 0.8f
+                                }
+                                .blur(5.dp)
+                        ) {}
 
                         Image(
                             painter = painterResource(id = item.iconRes),
@@ -470,7 +541,6 @@ fun TodayHourlyForecast(
                             modifier = Modifier
                                 .size(64.dp)
                                 .offset(y = -(20).dp)
-                                .shadow(elevation = 40.dp, clip = false)
                         )
                     }
                 }
@@ -485,88 +555,6 @@ fun TodayHourlyForecast(
     }
 }
 
-//@Composable
-//fun TodayHourlyForecast(
-//    cardBG: Color,
-//    textColor: Color,
-//    weather: WeatherUiModel?
-//) {
-//    Column(horizontalAlignment = Alignment.Start) {
-//        Text(
-//            text = "Today",
-//            fontSize = 20.sp,
-//            color = textColor,
-//            modifier = Modifier.padding(start = 16.dp, top = 8.dp)
-//        )
-//
-//        LazyRow(
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .padding(vertical = 16.dp),
-//            horizontalArrangement = Arrangement.spacedBy(12.dp),
-//            contentPadding = PaddingValues(horizontal = 16.dp)
-//        ) {
-//            // Safely take first 10 items or however many are available
-//            val hourlyData = weather?.hourlyForecast?.take(10) ?: emptyList()
-//
-//            items(hourlyData.size) { index ->
-//                val item = hourlyData[index]
-//
-//                Box(
-//                    modifier = Modifier
-//                        .width(88.dp)
-//                        .height(120.dp)
-//                        .padding(top = 10.dp),
-//                    contentAlignment = Alignment.TopCenter
-//                ) {
-//                    Card(
-//                        modifier = Modifier
-//                            .fillMaxWidth()
-//                            .height(110.dp)
-//                            .border(
-//                                width = 1.dp,
-//                                color = WhiteTransparent70.copy(alpha = 0.1f),
-//                                shape = RoundedCornerShape(16.dp)
-//                            ),
-//                        colors = CardDefaults.cardColors(containerColor = cardBG),
-//                    ) {
-//                        Column(
-//                            modifier = Modifier
-//                                .fillMaxSize()
-//                                .padding(top = 16.dp),
-//                            verticalArrangement = Arrangement.Center,
-//                            horizontalAlignment = Alignment.CenterHorizontally
-//                        ) {
-//                            Text(
-//                                text = item.temp,
-//                                fontSize = 16.sp,
-//                                modifier = Modifier.padding(top = 16.dp),
-//                                color = textColor
-//                            )
-//                            Spacer(modifier = Modifier.padding(2.dp))
-//                            Text(
-//                                text = item.time,
-//                                fontSize = 16.sp,
-//                                color = textColor
-//                            )
-//                        }
-//                    }
-//
-//                    Image(
-//                        painter = painterResource(id = item.iconRes),
-//                        contentDescription = null,
-//                        modifier = Modifier
-//                            .size(64.dp)
-//                            .offset(y = -(20).dp)
-//                            .shadow(elevation = 40.dp, clip = false)
-//                    )
-//                }
-//            }
-//        }
-//    }
-//}
-
-
 @Composable
 fun Next7DayItem(
     items: DailyUiItem?,
@@ -580,7 +568,6 @@ fun Next7DayItem(
             .fillMaxWidth()
             .then(
                 if (topRounded && bottomRounded) {
-                    // Single item with full rounded shape
                     Modifier.border(
                         width = 1.dp,
                         color = GrayTransparent66.copy(alpha = 0.08f),
