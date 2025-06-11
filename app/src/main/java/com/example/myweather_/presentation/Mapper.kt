@@ -7,36 +7,6 @@ import com.example.myweather_.domain.model.WeatherDomainModel
 import java.util.Calendar
 
 fun WeatherDomainModel.toUiModel(): WeatherUiModel {
-    val dailyForecastItems = (0 until dailyDates.size).map { index ->
-        DailyUiItem(
-            date = dailyDates.getOrNull(index) ?: "Unknown",
-            max = dailyMaxTemps.getOrNull(index)?.toString() ?: "N/A",
-            min = dailyMinTemps.getOrNull(index)?.toString() ?: "N/A",
-            iconRes = WeatherUtil.getWeatherImage(
-                dailyWeatherCodes.getOrNull(index) ?: 0,
-                isDay
-            )
-        )
-    }
-
-    val hourlyForecastItems = (0 until hourlyTimes.size).map { index ->
-        val rawTime = hourlyTimes.getOrNull(index) ?: "N/A"
-        val formattedTime = if (rawTime != "N/A") {
-            val parts = rawTime.split("T")[1].split(":")
-            "${parts[0]}:${parts[1]}"
-        } else {
-            "N/A"
-        }
-
-        HourlyUiItem(
-            time = formattedTime,
-            temp = "${hourlyTemperatures.getOrNull(index)?.toInt()}°C",
-            iconRes = WeatherUtil.getWeatherImage(
-                hourlyWeatherCodes.getOrNull(index) ?: 0,
-                isDay = isDay
-            )
-        )
-    }
 
     val forecastItems = mapToDailyUiItems(
         dailyDates = dailyDates,
@@ -45,6 +15,15 @@ fun WeatherDomainModel.toUiModel(): WeatherUiModel {
         dailyWeatherCodes = dailyWeatherCodes,
         isDay = isDay
     )
+
+
+    val hourlyForecastItems = filterTodayHourlyForecast(
+        hourlyTimes = hourlyTimes,
+        hourlyTemperatures = hourlyTemperatures,
+        hourlyWeatherCodes = hourlyWeatherCodes,
+        isDay=isDay
+    )
+
     return WeatherUiModel(
         temperature = "$temperature°C",
         humidity = "$humidity%",
@@ -59,7 +38,6 @@ fun WeatherDomainModel.toUiModel(): WeatherUiModel {
         dailyForecast = forecastItems,
         hourlyForecast = hourlyForecastItems
     )
-
 
 }
 
@@ -97,4 +75,45 @@ fun mapToDailyUiItems(
             )
         )
     }
+}
+
+fun filterTodayHourlyForecast(
+    hourlyTimes: List<String>,
+    hourlyTemperatures: List<Double>,
+    hourlyWeatherCodes: List<Int>,
+    isDay: Boolean
+): List<HourlyUiItem> {
+    val now = Calendar.getInstance()
+    val filtered = mutableListOf<HourlyUiItem>()
+
+    for (i in hourlyTimes.indices) {
+        val timeStr = hourlyTimes[i]
+        val cal = Calendar.getInstance().apply {
+            time = SimpleDateFormat("yyyy-MM-dd'T'HH:mm").parse(timeStr)
+        }
+
+        if (cal.get(Calendar.DAY_OF_YEAR) == now.get(Calendar.DAY_OF_YEAR) &&
+            cal.get(Calendar.YEAR) == now.get(Calendar.YEAR)
+        ) {
+
+            if (cal.timeInMillis >= now.timeInMillis) {
+                val formattedTime = "${cal.get(Calendar.HOUR_OF_DAY)}:${cal.get(Calendar.MINUTE)}"
+                val temp = hourlyTemperatures.getOrNull(i)?.toInt().toString()
+                val iconRes = WeatherUtil.getWeatherImage(
+                    weatherCode = hourlyWeatherCodes.getOrNull(i) ?: 0,
+                    isDay = isDay
+                )
+
+                filtered.add(
+                    HourlyUiItem(
+                        time = formattedTime,
+                        temp = "$temp°C",
+                        iconRes = iconRes
+                    )
+                )
+            }
+        }
+    }
+
+    return filtered.take(10)
 }

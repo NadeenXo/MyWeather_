@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.myweather_.presentation.WeatherScreen
@@ -13,7 +14,7 @@ import com.example.myweather_.presentation.WeatherViewModel
 import org.koin.androidx.compose.koinViewModel
 
 class MainActivity : ComponentActivity() {
-
+    lateinit var viewModel: WeatherViewModel
     val permissions = arrayOf(
         android.Manifest.permission.ACCESS_FINE_LOCATION,
         android.Manifest.permission.ACCESS_COARSE_LOCATION
@@ -24,25 +25,40 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
 //            MaterialTheme {
 //                WeatherScreen(true)
 //            }
-            WeatherApp(koinViewModel())
+            viewModel = koinViewModel()
+
+            WeatherApp(viewModel)
+            LaunchedEffect(Unit) {
+                if (permissions.any {
+                        ContextCompat.checkSelfPermission(this@MainActivity, it) != PackageManager.PERMISSION_GRANTED
+                    }) {
+                    ActivityCompat.requestPermissions(
+                        this@MainActivity,
+                        permissions,
+                        LOCATION_PERMISSION_REQUEST_CODE
+                    )
+                } else {
+                    viewModel.fetchLocation()
+                }
+            }
+
         }
 
-        if (permissions.any {
-                ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-            }) {
-            ActivityCompat.requestPermissions(this, permissions, LOCATION_PERMISSION_REQUEST_CODE)
-        }
-//        else {
-//            weatherViewModel.fetchLocation()
+//        if (permissions.any {
+//                ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+//            }) {
+//            ActivityCompat.requestPermissions(this, permissions, LOCATION_PERMISSION_REQUEST_CODE)
 //        }
-
-
+//        else {
+//            viewModel.fetchLocation()
+//        }
     }
-
+//
 //    override fun onRequestPermissionsResult(
 //        requestCode: Int,
 //        permissions: Array<String>,
@@ -56,9 +72,7 @@ class MainActivity : ComponentActivity() {
 //        ) {
 //            weatherViewModel.fetchLocation()
 //        }
-//
 //    }
-
 }
 
 //@Composable

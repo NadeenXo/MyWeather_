@@ -29,7 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
@@ -47,6 +47,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.myweather_.R
 import com.example.myweather_.ui.theme.Black
 import com.example.myweather_.ui.theme.BlackTransparent70
@@ -55,33 +58,47 @@ import com.example.myweather_.ui.theme.GrayTransparent66
 import com.example.myweather_.ui.theme.White
 import com.example.myweather_.ui.theme.WhiteTransparent70
 import org.koin.androidx.compose.koinViewModel
-import org.slf4j.MDC.put
 
 @Composable
 fun WeatherScreen(viewModel: WeatherViewModel) {
 
     val locationName = viewModel.locationName.value.toString()
     val weatherState = viewModel.weather.collectAsState()
-    val isDay = viewModel.isDay.toString().toBoolean()
+    val isDay = weatherState.value?.isDay
+    Log.d("TAG", "WeatherScreen: $isDay")
+//    LaunchedEffect(Unit) {
+//        viewModel.fetchLocation()
+//    }
 
-    LaunchedEffect(Unit) {
-        viewModel.fetchLocation()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.fetchLocation()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
+
     Log.i("TAG", "WeatherScreen: $locationName")
     Log.i("TAG", "WeatherScreen: ${weatherState.value?.temperature}")
 
-    val textColor = if (isDay) {
+    val textColor = if (isDay == true) {
         Black
     } else {
         White
     }
 
-    val gradientBrush = if (isDay) {
+    val gradientBrush = if (isDay == true) {
         Brush.verticalGradient(listOf(Blue, White))
     } else {
         Brush.verticalGradient(listOf(BlackTransparent70, Color(0xFF0D0C19)))
     }
-    val cardBG = if (isDay) {
+    val cardBG = if (isDay == true) {
         WhiteTransparent70
     } else {
         BlackTransparent70
@@ -386,6 +403,8 @@ fun TodayHourlyForecast(
     textColor: Color,
     weather: WeatherUiModel?
 ) {
+    val hourlyData = weather?.hourlyForecast ?: emptyList()
+
     Column(horizontalAlignment = Alignment.Start) {
         Text(
             text = "Today",
@@ -394,73 +413,158 @@ fun TodayHourlyForecast(
             modifier = Modifier.padding(start = 16.dp, top = 8.dp)
         )
 
-        LazyRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp)
-        ) {
-            // Safely take first 10 items or however many are available
-            val hourlyData = weather?.hourlyForecast?.take(10) ?: emptyList()
+        if (hourlyData.isNotEmpty()) {
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp)
+            ) {
+                items(hourlyData.size) { index ->
+                    val item = hourlyData[index]
 
-            items(hourlyData.size) { index ->
-                val item = hourlyData[index]
-
-                Box(
-                    modifier = Modifier
-                        .width(88.dp)
-                        .height(120.dp)
-                        .padding(top = 10.dp),
-                    contentAlignment = Alignment.TopCenter
-                ) {
-                    Card(
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(110.dp)
-                            .border(
-                                width = 1.dp,
-                                color = WhiteTransparent70.copy(alpha = 0.1f),
-                                shape = RoundedCornerShape(16.dp)
-                            ),
-                        colors = CardDefaults.cardColors(containerColor = cardBG),
+                            .width(88.dp)
+                            .height(120.dp)
+                            .padding(top = 10.dp),
+                        contentAlignment = Alignment.TopCenter
                     ) {
-                        Column(
+                        Card(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(top = 16.dp),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
+                                .fillMaxWidth()
+                                .height(110.dp)
+                                .border(
+                                    width = 1.dp,
+                                    color = WhiteTransparent70.copy(alpha = 0.1f),
+                                    shape = RoundedCornerShape(16.dp)
+                                ),
+                            colors = CardDefaults.cardColors(containerColor = cardBG),
                         ) {
-                            Text(
-                                text = item.temp,
-                                fontSize = 16.sp,
-                                modifier = Modifier.padding(top = 16.dp),
-                                color = textColor
-                            )
-                            Spacer(modifier = Modifier.padding(2.dp))
-                            Text(
-                                text = item.time,
-                                fontSize = 16.sp,
-                                color = textColor
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(top = 16.dp),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = item.temp,
+                                    fontSize = 16.sp,
+                                    modifier = Modifier.padding(top = 16.dp),
+                                    color = textColor
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = item.time,
+                                    fontSize = 16.sp,
+                                    color = textColor
+                                )
+                            }
                         }
-                    }
 
-                    Image(
-                        painter = painterResource(id = item.iconRes),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(64.dp)
-                            .offset(y = -(20).dp)
-                            .shadow(elevation = 40.dp, clip = false)
-                    )
+                        Image(
+                            painter = painterResource(id = item.iconRes),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(64.dp)
+                                .offset(y = -(20).dp)
+                                .shadow(elevation = 40.dp, clip = false)
+                        )
+                    }
                 }
             }
+        } else {
+            Text(
+                text = "No hourly forecast available",
+                modifier = Modifier.padding(16.dp),
+                color = textColor
+            )
         }
     }
 }
 
+//@Composable
+//fun TodayHourlyForecast(
+//    cardBG: Color,
+//    textColor: Color,
+//    weather: WeatherUiModel?
+//) {
+//    Column(horizontalAlignment = Alignment.Start) {
+//        Text(
+//            text = "Today",
+//            fontSize = 20.sp,
+//            color = textColor,
+//            modifier = Modifier.padding(start = 16.dp, top = 8.dp)
+//        )
+//
+//        LazyRow(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(vertical = 16.dp),
+//            horizontalArrangement = Arrangement.spacedBy(12.dp),
+//            contentPadding = PaddingValues(horizontal = 16.dp)
+//        ) {
+//            // Safely take first 10 items or however many are available
+//            val hourlyData = weather?.hourlyForecast?.take(10) ?: emptyList()
+//
+//            items(hourlyData.size) { index ->
+//                val item = hourlyData[index]
+//
+//                Box(
+//                    modifier = Modifier
+//                        .width(88.dp)
+//                        .height(120.dp)
+//                        .padding(top = 10.dp),
+//                    contentAlignment = Alignment.TopCenter
+//                ) {
+//                    Card(
+//                        modifier = Modifier
+//                            .fillMaxWidth()
+//                            .height(110.dp)
+//                            .border(
+//                                width = 1.dp,
+//                                color = WhiteTransparent70.copy(alpha = 0.1f),
+//                                shape = RoundedCornerShape(16.dp)
+//                            ),
+//                        colors = CardDefaults.cardColors(containerColor = cardBG),
+//                    ) {
+//                        Column(
+//                            modifier = Modifier
+//                                .fillMaxSize()
+//                                .padding(top = 16.dp),
+//                            verticalArrangement = Arrangement.Center,
+//                            horizontalAlignment = Alignment.CenterHorizontally
+//                        ) {
+//                            Text(
+//                                text = item.temp,
+//                                fontSize = 16.sp,
+//                                modifier = Modifier.padding(top = 16.dp),
+//                                color = textColor
+//                            )
+//                            Spacer(modifier = Modifier.padding(2.dp))
+//                            Text(
+//                                text = item.time,
+//                                fontSize = 16.sp,
+//                                color = textColor
+//                            )
+//                        }
+//                    }
+//
+//                    Image(
+//                        painter = painterResource(id = item.iconRes),
+//                        contentDescription = null,
+//                        modifier = Modifier
+//                            .size(64.dp)
+//                            .offset(y = -(20).dp)
+//                            .shadow(elevation = 40.dp, clip = false)
+//                    )
+//                }
+//            }
+//        }
+//    }
+//}
 
 
 @Composable
